@@ -12,6 +12,7 @@ fn _cmp(register: u8, operand: u8, mpu: *MPU) void {
 
 /// Compare accumulator to data
 pub fn cmp(mpu: *MPU) MicroOpError!void {
+    mpu.read(mpu.addr);
     _cmp(mpu.registers.ac, mpu.data, mpu);
 }
 
