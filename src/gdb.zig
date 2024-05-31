@@ -23,6 +23,8 @@ out: PacketBuffer,
 
 // Debug state
 step_count: i16 = -1,
+break_points: std.BoundedArray(u16, 32),
+last_addr: u16 = 0,
 
 /// Initialise server and start listening for connections
 pub fn init(address: net.Address) !Self {
@@ -35,6 +37,7 @@ pub fn init(address: net.Address) !Self {
         }),
         .in = PacketBuffer.init(),
         .out = PacketBuffer.init(),
+        .break_points = try std.BoundedArray(u16, 32).init(0),
     };
 }
 
@@ -45,6 +48,7 @@ pub fn deinit(self: *Self) void {
     self.server.deinit();
 }
 
+/// Get debug point interface.
 pub fn debugPort(self: *Self) DebugPort {
     return .{
         .ptr = self,
@@ -65,9 +69,19 @@ fn preDecode(ctx: *anyopaque, mpu: *const MPU) bool {
     }
 
     // Check break points
+    if (self.break_points.len > 0) {
+        // Ignore the last stop address to allow for stepping.
+        if ((self.last_addr != mpu.registers.pc) and (self.isBreakPoint(mpu.registers.pc))) {
+            self.step_count = 0;
+            self.last_addr = mpu.registers.pc;
+            std.log.info("[GDB] Breakpoint @ {X:0>4}", .{mpu.registers.pc});
+        }
+    }
+
     if (self.step_count > 0) {
         self.step_count -= 1;
         if (self.step_count == 0) {
+            self.last_addr = mpu.registers.pc;
             std.log.info("[GDB] Halted @ {X:0>4}", .{mpu.registers.pc});
         }
     }
@@ -96,6 +110,28 @@ fn processQuery(self: *Self, system: *System, packet: Packet) !void {
         try self.write_packet("");
     }
 }
+
+/// Check if address is a breakpoint
+fn isBreakPoint(self: Self, addr: u16) bool {
+    for (self.break_points.slice()) |break_point| {
+        if (break_point == addr) {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn setBreakPoint(self: *Self, addr: u16) bool {
+    if (!self.isBreakPoint(addr)) {
+        self.break_points.append(addr) catch {
+            return false;
+        };
+    }
+    return true;
+}
+
+// fn clearBreakPoint(self: *Self, addr: u16) void {
+// }
 
 fn processPacket(self: *Self, system: *System) !void {
     // Return if there is an incomplete packet
@@ -214,6 +250,36 @@ fn processPacket(self: *Self, system: *System) !void {
             } else {
                 std.log.warn("[GDB] Bad packet: {s}", .{packet.data});
                 try self.write_packet("E03");
+            }
+        },
+        'B' => {
+            // Set/Clear breakpoint
+            if (packet.data.len == 7) {
+                const addr = try packet.hexWordAt(1);
+                const mode = packet.data[6];
+                switch (mode) {
+                    's' => {
+                        // Set
+                        if (self.setBreakPoint(addr)) {
+                            std.log.info("[GDB] Set Breakpoint @ {X:0>4}", .{addr});
+                            try self.write_packet("OK");
+                        } else {
+                            try self.write_packet("E06");
+                        }
+                    },
+                    'c' => {
+                        // Clear
+                        std.log.info("[GDB] Clear Breakpoint @ {X:0>4}", .{addr});
+                        try self.write_packet("OK");
+                    },
+                    else => {
+                        std.log.warn("[GDB] Invalid mode: {c}", .{mode});
+                        try self.write_packet("E05");
+                    },
+                }
+            } else {
+                std.log.warn("[GDB] Bad packet: {s}", .{packet.data});
+                try self.write_packet("E04");
             }
         },
         else => {

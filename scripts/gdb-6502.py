@@ -161,6 +161,7 @@ class GDBClient:
         return self._decode_stop_response(packet)
 
     async def send_jump(self, address: int) -> bool:
+        """JUmp."""
         await self.send_packet(f"j{address:04X}".encode("ascii"))
         packet = await self.next_packet()
         return packet == b'OK'
@@ -177,6 +178,12 @@ class GDBClient:
         packet = await self.next_packet()
         items = packet.decode("ascii").split(";")
         return [Peripheral.from_string(item) for item in items]
+
+    async def send_breakpoint(self, address: int, clear: bool = False) -> bool:
+        """Send breakpoint."""
+        await self.send_packet(f"B{address:04X},{'c' if clear else 's'}".encode("ascii"))
+        packet = await self.next_packet()
+        return packet == b'OK'
 
 
 class GDBTextInterface:
@@ -229,7 +236,8 @@ class GDBTextInterface:
             case ["help"]:
                 print(
                     "q | quit               Quit app\n"
-                    "b | break              Add breakpoint (not yet supported)\n"
+                    "b | break ADDR         Add breakpoint\n"
+                    "clear ADDR             Clear breakpoint\n"
                     "c | cont | continue    Continue program\n"
                     "s | step               Step one instruction\n"
                     "j | jump ADDR          Set program counter to address\n"
@@ -245,8 +253,27 @@ class GDBTextInterface:
                     "list LINE_NUM          List code at LINE_NUM\n"
                 )
 
-            case ["break"]:
-                print("Add Breakpoint")
+            case ["break", addr]:
+                try:
+                    addr = parse_number(addr)
+                except ValueError as ex:
+                    print("Invalid value:", ex)
+                else:
+                    if await client.send_breakpoint(addr):
+                        print("OK")
+                    else:
+                        print("Failed to set breakpoint.")
+
+            case ["clear", addr]:
+                try:
+                    addr = parse_number(addr)
+                except ValueError as ex:
+                    print("Invalid value:", ex)
+                else:
+                    if await client.send_breakpoint(addr, True):
+                        print("OK")
+                    else:
+                        print("Failed to clear breakpoint.")
 
             case ["halt"]:
                 response = await client.send_stop()
@@ -352,7 +379,7 @@ class GDBTextInterface:
                 print_reg("YR", 2)
                 print_reg("SP", 3)
                 print(f"PC: 0x{registers[4:6].hex()}")
-                print_reg("SP", 6)
+                print(f"SR: 0b{int(registers[6]):08b}")
 
             case ["peripherals"]:
                 print("Peripherals")
@@ -376,12 +403,12 @@ class GDBTextInterface:
         match args:
             case [addr]:
                 address = int(addr, 16)
-                memory = await client.get_memory(address, 1)
+                memory = await client.get_memory(address, 0)
                 print(memory.hex(":", 2))
 
             case [addr, ops]:
                 address = int(addr, 16)
-                length = int(ops)
+                length = int(ops) - 1
                 memory = await client.get_memory(address, length)
                 print(memory.hex(":", 2))
 
