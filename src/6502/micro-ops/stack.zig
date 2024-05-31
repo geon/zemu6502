@@ -15,6 +15,8 @@ pub fn push_ac(mpu: *MPU) MicroOpError!void {
 pub fn pull_ac(mpu: *MPU) MicroOpError!void {
     try mpu.pop_stack();
     mpu.registers.ac = mpu.data;
+    mpu.registers.sr.update_negative(mpu.data);
+    mpu.registers.sr.update_zero(mpu.data);
 }
 
 /// Push low byte of program counter to stack and replace addr
@@ -56,13 +58,13 @@ pub fn pull_pc_h(mpu: *MPU) MicroOpError!void {
 /// Push status register to the stack
 pub fn push_sr(mpu: *MPU) MicroOpError!void {
     mpu.data = @bitCast(mpu.registers.sr);
-    // TODO: handle bit masking
+    mpu.data |= 0x30; // Set the ignored and break flags
     try mpu.push_stack();
 }
 
 /// PUll status register from the stack
 pub fn pull_sr(mpu: *MPU) MicroOpError!void {
     try mpu.pop_stack();
-    // TODO: handle bit masking
+    mpu.data &= 0xCF; // Clear the ignored and break flags
     mpu.registers.sr = @bitCast(mpu.data);
 }
