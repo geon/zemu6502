@@ -1,6 +1,6 @@
 ---
 # Clock Frequency (in Hz)
-clockFreq: 1000
+clockFreq: 100_000
 
 # GDB connection
 gdb:
