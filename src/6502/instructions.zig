@@ -42,6 +42,7 @@ const eor_immediate = @import("micro-ops/logical.zig").eor_immediate;
 const inc = @import("micro-ops/increments.zig").inc;
 const inx = @import("micro-ops/increments.zig").inx;
 const iny = @import("micro-ops/increments.zig").iny;
+const jump_indirect = @import("micro-ops/branch.zig").jump_indirect;
 const lsr = @import("micro-ops/bitshift.zig").lsr;
 const lsr_immediate = @import("micro-ops/bitshift.zig").lsr_immediate;
 const ora = @import("micro-ops/logical.zig").ora;
@@ -193,7 +194,7 @@ pub const OPERATIONS = [_]Instruction{
     Instruction{ .syntax = "EOR abs,X", .len = 3, .micro_ops = [6]*const MicroOp{ pc_read_to_addr, pc_read_to_addr_h_add_xr, eor, nop, nop, nop } }, // 0x5D: EOR abs,X
     Instruction{ .syntax = "LSR abs,X", .len = 6, .micro_ops = [6]*const MicroOp{ pc_read_to_addr, pc_read_to_addr_h, addr_add_xr, addr_read_to_data, lsr, data_write_to_addr } }, // 0x5E: LSR abs,X
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x5F:
-    Instruction{ .syntax = "RTS impl", .len = 3, .micro_ops = [6]*const MicroOp{ pull_pc_l, pull_pc_h, jmp, nop, nop, nop } }, // 0x60: RTS impl
+    Instruction{ .syntax = "RTS impl", .len = 3, .micro_ops = [6]*const MicroOp{ pull_pc_l, pull_pc_h, rts, nop, nop, nop } }, // 0x60: RTS impl
     Instruction{ .syntax = "ADC X,ind", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x61: ADC X,ind TODO
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x62:
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x63:
@@ -205,7 +206,7 @@ pub const OPERATIONS = [_]Instruction{
     Instruction{ .syntax = "ADC #", .len = 1, .micro_ops = [6]*const MicroOp{ adc_immediate, nop, nop, nop, nop, nop } }, // 0x69: ADC #
     Instruction{ .syntax = "ROR A", .len = 1, .micro_ops = [6]*const MicroOp{ ror_immediate, nop, nop, nop, nop, nop } }, // 0x6A: ROR A
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x6B:
-    Instruction{ .syntax = "JMP ind", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x6C: JMP ind
+    Instruction{ .syntax = "JMP ind", .len = 4, .micro_ops = [6]*const MicroOp{ pc_read_to_addr, pc_read_to_addr_h, addr_read_to_data, jump_indirect, nop, nop } }, // 0x6C: JMP ind
     Instruction{ .syntax = "ADC abs", .len = 3, .micro_ops = [6]*const MicroOp{ pc_read_to_addr, pc_read_to_addr_h, adc, nop, nop, nop } }, // 0x6D: ADC abs
     Instruction{ .syntax = "ROR abs", .len = 5, .micro_ops = [6]*const MicroOp{ pc_read_to_addr, pc_read_to_addr_h, addr_read_to_data, ror, data_write_to_addr, nop } }, // 0x6E: ROR abs
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x6F:
@@ -450,6 +451,11 @@ fn jmp(mpu: *MPU) MicroOpError!void {
 /// Set pc to addr.
 fn jsr(mpu: *MPU) MicroOpError!void {
     mpu.registers.pc = mpu.addr;
+}
+
+/// Set pc to addr + 1.
+fn rts(mpu: *MPU) MicroOpError!void {
+    mpu.registers.pc = mpu.addr + 1;
 }
 
 /// Clear interrupt state.
