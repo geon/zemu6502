@@ -172,6 +172,12 @@ pub fn main() !void {
     defer system.deinit();
     std.log.info("Initialised system @ {d}Hz", .{system_config.clockFreq});
     try createPeripherals(allocator, system_dir, &system, system_config);
+
+    // Attach GDB
+    if (gdb) |*instance| {
+        system.mpu.debug_port = instance.debugPort();
+    }
+
     system.reset();
 
     while (!rl.windowShouldClose()) {

@@ -4,7 +4,8 @@ const net = std.net;
 const posix = std.posix;
 
 const System = @import("system.zig");
-const RunMode = @import("6502/mpu.zig").RunMode;
+const DebugPort = @import("6502/mpu.zig").DebugPort;
+const MPU = @import("6502/mpu.zig").MPU;
 const BufferError = @import("gdb/packet.zig").BufferError;
 const PacketBuffer = @import("gdb/packet.zig").PacketBuffer;
 const Packet = @import("gdb/packet.zig").Packet;
@@ -20,9 +21,13 @@ connection: ?net.Server.Connection = null,
 in: PacketBuffer,
 out: PacketBuffer,
 
+// Debug state
+step_count: i16 = -1,
+
 /// Initialise server and start listening for connections
 pub fn init(address: net.Address) !Self {
     std.log.info("Waiting for GDB connection on {}...", .{address});
+
     return .{
         .server = try address.listen(.{
             .kernel_backlog = 1, // Only allow a single connection at a time.
@@ -40,7 +45,37 @@ pub fn deinit(self: *Self) void {
     self.server.deinit();
 }
 
-// Process a Query (q) packet
+pub fn debugPort(self: *Self) DebugPort {
+    return .{
+        .ptr = self,
+        .vtable = &.{
+            .pre_decode = preDecode,
+            // .post_decode = postDecode,
+        },
+    };
+}
+
+/// Event before decoding
+fn preDecode(ctx: *anyopaque, mpu: *const MPU) bool {
+    const self: *Self = @ptrCast(@alignCast(ctx));
+
+    // Halted
+    if (self.step_count == 0) {
+        return false;
+    }
+
+    // Check break points
+    if (self.step_count > 0) {
+        self.step_count -= 1;
+        if (self.step_count == 0) {
+            std.log.info("[GDB] Halted @ {X:0>4}", .{mpu.registers.pc});
+        }
+    }
+
+    return self.step_count != 0;
+}
+
+/// Process a Query (q) packet
 fn processQuery(self: *Self, system: *System, packet: Packet) !void {
     if (packet.startsWith("qPeripherals")) {
         const start = try self.start_packet();
@@ -84,10 +119,10 @@ fn processPacket(self: *Self, system: *System) !void {
     switch (packet.data[0]) {
         '?' => {
             // Halt reason
-            if (system.mpu.running) {
-                try self.write_packet("S13");
-            } else {
+            if (self.step_count == 0) {
                 try self.write_packet("S11");
+            } else {
+                try self.write_packet("S13");
             }
         },
         'g' => {
@@ -149,12 +184,12 @@ fn processPacket(self: *Self, system: *System) !void {
         },
         'c' => {
             // Continue
-            system.mpu.run();
+            self.step_count = -1;
             try self.write_packet("S13"); // 0x13 (19)
         },
         's' => {
             // Step (and report PC location)
-            system.mpu.step();
+            self.step_count = 2;
             const packet_start = try self.start_packet();
             try self.out.append("T1104:");
             try self.out.appendWord(system.mpu.current_loc);
@@ -162,7 +197,7 @@ fn processPacket(self: *Self, system: *System) !void {
         },
         't' => {
             // Stop the processor
-            system.mpu.halt();
+            self.step_count = 0;
             const packet_start = try self.start_packet();
             try self.out.append("T1104:");
             try self.out.appendWord(system.mpu.current_loc);

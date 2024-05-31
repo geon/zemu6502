@@ -7,6 +7,25 @@ const ops = @import("instructions.zig");
 const DataBus = @import("../data-bus.zig");
 const Peripheral = @import("../peripheral.zig");
 
+pub const DebugPort = struct {
+    ptr: *anyopaque,
+    vtable: *const VTable,
+
+    pub const VTable = struct {
+        /// Event before decoding (return false if halted)
+        pre_decode: *const fn (ctx: *anyopaque, mpu: *const MPU) bool,
+        /// Event after decoding
+        post_decode: ?*const fn (ctx: *anyopaque, mpu: *const MPU) void = null,
+    };
+
+    fn preDecode(self: DebugPort, mpu: *MPU) bool {
+        return self.vtable.pre_decode(self.ptr, mpu);
+    }
+    fn postDecode(self: DebugPort, mpu: *MPU) void {
+        if (self.vtable.post_decode) |post_decode| post_decode(self.ptr, mpu);
+    }
+};
+
 /// Status register defition.
 pub const StatusRegister = packed struct(u8) {
     const Self = @This();
@@ -117,12 +136,9 @@ pub const Instruction = struct {
 pub const MPU = struct {
     const Self = @This();
 
-    // Run status for remote control
-    running: bool = true,
-    step_count: u8 = 0,
-
-    // Address bus
+    // External buses
     data_bus: *DataBus,
+    debug_port: ?DebugPort = null,
 
     // Register bank and state variables
     registers: Registers = .{},
@@ -158,58 +174,21 @@ pub const MPU = struct {
         self.data = 0;
     }
 
-    /// Halt at the next instruction.
-    pub fn halt(self: *Self) void {
-        if (self.running) {
-            std.log.info("Halt...", .{});
-            self.running = false;
-            self.step_count = 0;
-        }
-    }
-
-    /// Run the next instruction.
-    pub fn step(self: *Self) void {
-        if (self.running or self.step_count > 0) {
-            std.log.warn("Cannot step outside the halt state.", .{});
-        } else {
-            self.running = false;
-            self.step_count = 1;
-        }
-    }
-
-    /// Step N instructions
-    pub fn stepN(self: *Self, step_count: u8) void {
-        if (self.running or self.step_count > 0) {
-            std.log.warn("Cannot step outside the halt state.", .{});
-        } else {
-            self.running = false;
-            self.step_count = step_count;
-        }
-    }
-
-    /// Run the next instruction.
-    pub fn run(self: *Self) void {
-        if (!self.running) {
-            std.log.info("Run!", .{});
-            self.running = true;
-        }
-    }
-
     /// Clock tick (advance to the next micro-operation)
     pub fn clock(self: *Self, edge: bool) void {
         self.data_bus.clock(edge);
         if (edge) {
             if (self.current.len <= self.op_idx) {
-                if (self.running or self.step_count > 0) {
+                if (self.debug_port) |debug_port| {
+                    // Use debug port interface if one is attached.
+                    if (debug_port.preDecode(self)) {
+                        self.executed_ops +%= 1;
+                        self.decode_next_op();
+                        debug_port.postDecode(self);
+                    }
+                } else {
                     self.executed_ops +%= 1;
                     self.decode_next_op();
-
-                    if (self.step_count > 0) {
-                        self.step_count -= 1;
-                        if (self.step_count == 0) {
-                            std.log.info("Halted at {X:0>2}", .{self.current_loc});
-                        }
-                    }
                 }
             } else {
                 self.executed_micro_ops +%= 1;
