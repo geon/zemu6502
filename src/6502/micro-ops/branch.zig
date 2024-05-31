@@ -43,6 +43,17 @@ test "jump_relative for negative jumps" {
     try std.testing.expectEqual(0x7FEE, mpu.registers.pc);
 }
 
+/// Jump indirect
+pub fn jump_indirect(mpu: *MPU) MicroOpError!void {
+    var addr: u16 = mpu.data;
+
+    // Read high byte
+    mpu.read(mpu.addr + 1);
+    addr += @as(u16, mpu.data) << 8;
+
+    mpu.registers.pc = addr;
+}
+
 /// If the carry flag is set jump to value in data
 pub fn bcs(mpu: *MPU) MicroOpError!void {
     mpu.read_pc();
