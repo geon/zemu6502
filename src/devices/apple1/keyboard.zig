@@ -1,6 +1,8 @@
 //! Keyboard peripheral device.
 //!
-//! Quirks: Bit 7 is always set high.
+//! Quirks:
+//! - Bit 7 is always set high
+//! - Only upper case is supported
 //!
 
 const std = @import("std");
@@ -37,13 +39,16 @@ pub fn peripheral(self: *Self) Peripheral {
 pub fn loop(ctx: *anyopaque) PeripheralError!void {
     const self: *Self = @ptrCast(@alignCast(ctx));
 
-    const char: u8 = switch (rl.getKeyPressed()) {
+    var char: u8 = switch (rl.getKeyPressed()) {
         KeyboardKey.key_enter => 0x0A,
         KeyboardKey.key_backspace => 0x08,
         KeyboardKey.key_escape => 0x1B,
         else => @intCast(rl.getCharPressed()),
     };
     if (char > 0) {
+        if (char >= 'a' and char <= 'z') {
+            char -= 32; // Uppercase.
+        }
         self.key = char | 0x80;
     }
 }
