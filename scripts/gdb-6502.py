@@ -179,6 +179,13 @@ class GDBClient:
         items = packet.decode("ascii").split(";")
         return [Peripheral.from_string(item) for item in items]
 
+    async def query_breakpoints(self) -> list[Peripheral]:
+        """Query breakpoints."""
+        await self.send_packet(b"qBreakpoints")
+        packet = await self.next_packet()
+        items = packet.decode("ascii").split(";")
+        return [int(item, 16) for item in items]
+
     async def send_breakpoint(self, address: int, clear: bool = False) -> bool:
         """Send breakpoint."""
         await self.send_packet(f"B{address:04X},{'c' if clear else 's'}".encode("ascii"))
@@ -216,10 +223,14 @@ class GDBTextInterface:
         if not (atoms := command.split(" ")):
             return
 
+        if not command:
+            return
+
         # Translate first command
         atoms[0] = {
             "q": "quit",
             "b": "break",
+            "B": "clear",
             "c": "continue",
             "cont": "continue",
             "s": "step",
@@ -237,13 +248,14 @@ class GDBTextInterface:
                 print(
                     "q | quit               Quit app\n"
                     "b | break ADDR         Add breakpoint\n"
-                    "clear ADDR             Clear breakpoint\n"
+                    "B | clear ADDR         Clear breakpoint\n"
                     "c | cont | continue    Continue program\n"
                     "s | step               Step one instruction\n"
                     "j | jump ADDR          Set program counter to address\n"
                     "i | info               Get info\n"
-                    "    r | reg | registers     Get info on registers\n"
-                    "    p | peri | peripherals  List Peripherals\n"
+                    "    r | reg | registers       Get info on registers\n"
+                    "    p | peri | peripherals    List Peripherals\n"
+                    "    b | break | breakpoints   List Breakpoints\n"
                     "x|examine ADDR         Examine memory at address ADDR (hex)\n"
                     "x/n ADDR               Example n bytes of memory from address ADDR (hex)\n"
                     "set ADDR VALUE         Set the value of an address (can accept 0x, 0o prefixes)\n"
@@ -334,6 +346,9 @@ class GDBTextInterface:
                 print("Quit")
                 sys.exit(0)
 
+            case []:
+                pass
+
             case _:
                 if atoms[0].startswith("x/") and len(atoms) == 2:
                     await self.parse_examine([atoms[1], atoms[0][2:]], client)
@@ -363,6 +378,8 @@ class GDBTextInterface:
             "reg": "registers",
             "p": "peripherals",
             "peri": "peripherals",
+            "b": "breakpoints",
+            "break": "breakpoints",
         }.get(args[0], args[0])
 
         match args:
@@ -385,6 +402,11 @@ class GDBTextInterface:
                 print("Peripherals")
                 peripherals = await client.query_peripherals()
                 print("\n".join(map(str, peripherals)))
+
+            case ["breakpoints"]:
+                print("Breakpoints")
+                peripherals = await client.query_breakpoints()
+                print("\n".join(map(lambda addr: f"- 0x{addr:04X}", peripherals)))
 
             case ["line"]:
                 address = self._current_addr

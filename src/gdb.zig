@@ -83,6 +83,19 @@ fn preDecode(ctx: *anyopaque, mpu: *const MPU) bool {
         if (self.step_count == 0) {
             self.last_addr = mpu.registers.pc;
             std.log.info("[GDB] Halted @ {X:0>4}", .{mpu.registers.pc});
+
+            const packet_start = self.start_packet() catch {
+                return false;
+            };
+            self.out.append("T1104:") catch {
+                return false;
+            };
+            self.out.appendWord(mpu.registers.pc) catch {
+                return false;
+            };
+            self.end_packet(packet_start) catch {
+                return false;
+            };
         }
     }
 
@@ -105,6 +118,15 @@ fn processQuery(self: *Self, system: *System, packet: Packet) !void {
         }
         self.out.len -= 1; // Remove last final separator.
         try self.end_packet(start);
+    } else if (packet.startsWith("qBreakpoints")) {
+        const start = try self.start_packet();
+        for (self.break_points.slice()) |addr| {
+            try self.out.append(&utils.hexDigits(@truncate(addr >> 8)));
+            try self.out.append(&utils.hexDigits(@truncate(addr)));
+            try self.out.append(";");
+        }
+        self.out.len -= 1; // Remove last final separator.
+        try self.end_packet(start);
     } else {
         // std.log.debug("Unknown query: {s}", .{packet.data});
         try self.write_packet("");
@@ -113,16 +135,29 @@ fn processQuery(self: *Self, system: *System, packet: Packet) !void {
 
 /// Check if address is a breakpoint
 fn isBreakPoint(self: Self, addr: u16) bool {
-    for (self.break_points.slice()) |break_point| {
-        if (break_point == addr) {
-            return true;
-        }
+    if (self.indexOfBreakPoint(addr)) |_| {
+        return true;
+    } else {
+        return false;
     }
-    return false;
 }
 
+/// Find index of a breakpoint address.
+fn indexOfBreakPoint(self: Self, addr: u16) ?usize {
+    for (self.break_points.slice(), 0..) |breakpoint, idx| {
+        if (breakpoint == addr) {
+            return idx;
+        }
+    }
+    return null;
+}
+
+/// Set a breakpoint
 fn setBreakPoint(self: *Self, addr: u16) bool {
-    if (!self.isBreakPoint(addr)) {
+    if (self.indexOfBreakPoint(addr)) |idx| {
+        std.log.warn("Breakpoint already set: {}", .{idx});
+    } else {
+        // Add breakpoint
         self.break_points.append(addr) catch {
             return false;
         };
@@ -130,8 +165,12 @@ fn setBreakPoint(self: *Self, addr: u16) bool {
     return true;
 }
 
-// fn clearBreakPoint(self: *Self, addr: u16) void {
-// }
+/// Clear a breakpoint
+fn clearBreakPoint(self: *Self, addr: u16) void {
+    if (self.indexOfBreakPoint(addr)) |idx| {
+        _ = self.break_points.orderedRemove(idx);
+    }
+}
 
 fn processPacket(self: *Self, system: *System) !void {
     // Return if there is an incomplete packet
@@ -226,18 +265,10 @@ fn processPacket(self: *Self, system: *System) !void {
         's' => {
             // Step (and report PC location)
             self.step_count = 2;
-            const packet_start = try self.start_packet();
-            try self.out.append("T1104:");
-            try self.out.appendWord(system.mpu.current_loc);
-            try self.end_packet(packet_start);
         },
         't' => {
             // Stop the processor
             self.step_count = 0;
-            const packet_start = try self.start_packet();
-            try self.out.append("T1104:");
-            try self.out.appendWord(system.mpu.current_loc);
-            try self.end_packet(packet_start);
         },
         'r', 'R' => system.reset(),
         'q' => try self.processQuery(system, packet),
@@ -245,8 +276,13 @@ fn processPacket(self: *Self, system: *System) !void {
             // Jump/Run from a particular PC address.
             if (packet.data.len != 8) {
                 const addr = try packet.hexWordAt(1);
-                system.mpu.registers.pc = addr;
-                try self.write_packet("OK");
+                if (self.step_count == 0) {
+                    system.mpu.registers.pc = addr;
+                    try self.write_packet("OK");
+                } else {
+                    std.log.warn("[GDB] Cannot jump when processor not halted", .{});
+                    try self.write_packet("ERR");
+                }
             } else {
                 std.log.warn("[GDB] Bad packet: {s}", .{packet.data});
                 try self.write_packet("E03");
@@ -269,6 +305,7 @@ fn processPacket(self: *Self, system: *System) !void {
                     },
                     'c' => {
                         // Clear
+                        self.clearBreakPoint(addr);
                         std.log.info("[GDB] Clear Breakpoint @ {X:0>4}", .{addr});
                         try self.write_packet("OK");
                     },
@@ -351,14 +388,14 @@ pub fn pollData(self: *Self, connection: net.Server.Connection, system: *System)
                 },
                 else => return err,
             };
-
-            // Write out anything in the output buffer.
-            if (self.out.len > 0) {
-                try connection.stream.writeAll(&self.out.data);
-                std.log.debug("[GDB] < {s}", .{self.out.asSlice()});
-                self.out.clear();
-            }
         }
+    }
+
+    // Write out anything in the output buffer.
+    if (self.out.len > 0) {
+        try connection.stream.writeAll(&self.out.data);
+        std.log.debug("[GDB] < {s}", .{self.out.asSlice()});
+        self.out.clear();
     }
 }
 
