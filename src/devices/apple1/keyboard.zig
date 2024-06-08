@@ -3,6 +3,7 @@
 //! Quirks:
 //! - Bit 7 is always set high
 //! - Only upper case is supported
+//! - Enter returns a Carridge return.
 //!
 
 const std = @import("std");
@@ -40,7 +41,7 @@ pub fn loop(ctx: *anyopaque) PeripheralError!void {
     const self: *Self = @ptrCast(@alignCast(ctx));
 
     var char: u8 = switch (rl.getKeyPressed()) {
-        KeyboardKey.key_enter => 0x0A,
+        KeyboardKey.key_enter => 0x0D,
         KeyboardKey.key_backspace => 0x08,
         KeyboardKey.key_escape => 0x1B,
         else => @intCast(rl.getCharPressed()),
