@@ -63,10 +63,12 @@ const pull_pc_h = @import("micro-ops/stack.zig").pull_pc_h;
 const pull_sr = @import("micro-ops/stack.zig").pull_sr;
 const push_ac = @import("micro-ops/stack.zig").push_ac;
 const push_pc_l = @import("micro-ops/stack.zig").push_pc_l;
-const push_pc_l_word_offset = @import("micro-ops/stack.zig").push_pc_l_word_offset;
+const push_pc_l_byte_offset = @import("micro-ops/stack.zig").push_pc_l_byte_offset;
 const push_pc_h = @import("micro-ops/stack.zig").push_pc_h;
-const push_pc_h_word_offset = @import("micro-ops/stack.zig").push_pc_h_word_offset;
+const push_pc_h_byte_offset = @import("micro-ops/stack.zig").push_pc_h_byte_offset;
 const push_sr = @import("micro-ops/stack.zig").push_sr;
+const php = @import("micro-ops/stack.zig").php;
+const plp = @import("micro-ops/stack.zig").plp;
 const rol = @import("micro-ops/bitshift.zig").rol;
 const rol_immediate = @import("micro-ops/bitshift.zig").rol_immediate;
 const ror = @import("micro-ops/bitshift.zig").ror;
@@ -114,7 +116,7 @@ pub const IRQ_OPERATION: Instruction = Instruction{
 };
 
 pub const OPERATIONS = [_]Instruction{
-    Instruction{ .syntax = "BRK impl", .len = 6, .micro_ops = [6]*const MicroOp{ sei, push_pc_h, push_pc_l, push_sr, irq_vector_to_pc, jmp } }, // 0x00: BRK impl
+    Instruction{ .syntax = "BRK impl", .len = 6, .micro_ops = [6]*const MicroOp{ nop, push_pc_h, push_pc_l, php, irq_vector_to_pc, jmp } }, // 0x00: BRK impl
     Instruction{ .syntax = "ORA X,ind", .len = 5, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, addr_add_xr, data_read_from_addr, addr_h_read_from_addr_indirect, ora, nop } }, // 0x01: ORA X,ind
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x02:
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x03:
@@ -122,7 +124,7 @@ pub const OPERATIONS = [_]Instruction{
     Instruction{ .syntax = "ORA zpg", .len = 2, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, ora, nop, nop, nop, nop } }, // 0x05: ORA zpg
     Instruction{ .syntax = "ASL zpg", .len = 4, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, data_read_from_addr, asl, data_write_to_addr, nop, nop } }, // 0x06: ASL zpg
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x07:
-    Instruction{ .syntax = "PHP impl", .len = 2, .micro_ops = [6]*const MicroOp{ nop, push_sr, nop, nop, nop, nop } }, // 0x08: PHP impl
+    Instruction{ .syntax = "PHP impl", .len = 2, .micro_ops = [6]*const MicroOp{ nop, php, nop, nop, nop, nop } }, // 0x08: PHP impl
     Instruction{ .syntax = "ORA #", .len = 1, .micro_ops = [6]*const MicroOp{ ora_immediate, nop, nop, nop, nop, nop } }, // 0x09: ORA #
     Instruction{ .syntax = "ASL A", .len = 1, .micro_ops = [6]*const MicroOp{ asl_immediate, nop, nop, nop, nop, nop } }, // 0x0A: ASL A
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x0B:
@@ -146,7 +148,7 @@ pub const OPERATIONS = [_]Instruction{
     Instruction{ .syntax = "ORA abs,X", .len = 3, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, addr_h_read_from_pc_add_xr, ora, nop, nop, nop } }, // 0x1D: ORA abs,X
     Instruction{ .syntax = "ASL abs,X", .len = 6, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, addr_h_read_from_pc, addr_add_xr, data_read_from_addr, asl, data_write_to_addr } }, // 0x1E: ASL abs,X
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x1F:
-    Instruction{ .syntax = "JSR abs", .len = 5, .micro_ops = [6]*const MicroOp{ push_pc_h_word_offset, push_pc_l_word_offset, addr_l_read_from_pc, addr_h_read_from_pc, jsr, nop } }, // 0x20: JSR abs
+    Instruction{ .syntax = "JSR abs", .len = 5, .micro_ops = [6]*const MicroOp{ push_pc_h_byte_offset, push_pc_l_byte_offset, addr_l_read_from_pc, addr_h_read_from_pc, jsr, nop } }, // 0x20: JSR abs
     Instruction{ .syntax = "AND X,ind", .len = 5, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, addr_add_xr, data_read_from_addr, addr_h_read_from_addr_indirect, and_, nop } }, // 0x21: AND X,ind
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x22:
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x23:
@@ -154,7 +156,7 @@ pub const OPERATIONS = [_]Instruction{
     Instruction{ .syntax = "AND zpg", .len = 2, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, and_, nop, nop, nop, nop } }, // 0x25: AND zpg
     Instruction{ .syntax = "ROL zpg", .len = 4, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, data_read_from_addr, rol, data_write_to_addr, nop, nop } }, // 0x26: ROL zpg
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x27:
-    Instruction{ .syntax = "PLP impl", .len = 2, .micro_ops = [6]*const MicroOp{ pull_sr, nop, nop, nop, nop, nop } }, // 0x28: PLP impl
+    Instruction{ .syntax = "PLP impl", .len = 2, .micro_ops = [6]*const MicroOp{ plp, nop, nop, nop, nop, nop } }, // 0x28: PLP impl
     Instruction{ .syntax = "AND #", .len = 1, .micro_ops = [6]*const MicroOp{ and_immediate, nop, nop, nop, nop, nop } }, // 0x29: AND #
     Instruction{ .syntax = "ROL A", .len = 1, .micro_ops = [6]*const MicroOp{ rol_immediate, nop, nop, nop, nop, nop } }, // 0x2A: ROL A
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x2B:
@@ -178,7 +180,7 @@ pub const OPERATIONS = [_]Instruction{
     Instruction{ .syntax = "AND abs,X", .len = 3, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, addr_h_read_from_pc_add_xr, and_, nop, nop, nop } }, // 0x3D: AND abs,X
     Instruction{ .syntax = "ROL abs,X", .len = 6, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, addr_h_read_from_pc, addr_add_xr, data_read_from_addr, rol, data_write_to_addr } }, // 0x3E: ROL abs,X
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x3F:
-    Instruction{ .syntax = "RTI impl", .len = 5, .micro_ops = [6]*const MicroOp{ pull_sr, pull_pc_l, pull_pc_h, addr_to_pc, rti, nop } }, // 0x40: RTI impl
+    Instruction{ .syntax = "RTI impl", .len = 5, .micro_ops = [6]*const MicroOp{ plp, pull_pc_l, pull_pc_h, addr_to_pc, rti, nop } }, // 0x40: RTI impl
     Instruction{ .syntax = "EOR X,ind", .len = 5, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, addr_add_xr, data_read_from_addr, addr_h_read_from_addr_indirect, eor, nop } }, // 0x41: EOR X,ind
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x42:
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x43:
@@ -218,7 +220,7 @@ pub const OPERATIONS = [_]Instruction{
     Instruction{ .syntax = "ADC zpg", .len = 2, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, adc, nop, nop, nop, nop } }, // 0x65: ADC zpg
     Instruction{ .syntax = "ROR zpg", .len = 4, .micro_ops = [6]*const MicroOp{ addr_l_read_from_pc, data_read_from_addr, ror, data_write_to_addr, nop, nop } }, // 0x66: ROR zpg
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x67:
-    Instruction{ .syntax = "PLA impl", .len = 2, .micro_ops = [6]*const MicroOp{ pull_ac, nop, nop, nop, nop, nop } }, // 0x68: PLA impl
+    Instruction{ .syntax = "PLA impl", .len = 3, .micro_ops = [6]*const MicroOp{ pull_ac, nop, nop, nop, nop, nop } }, // 0x68: PLA impl
     Instruction{ .syntax = "ADC #", .len = 1, .micro_ops = [6]*const MicroOp{ adc_immediate, nop, nop, nop, nop, nop } }, // 0x69: ADC #
     Instruction{ .syntax = "ROR A", .len = 1, .micro_ops = [6]*const MicroOp{ ror_immediate, nop, nop, nop, nop, nop } }, // 0x6A: ROR A
     Instruction{ .syntax = "", .len = 0, .micro_ops = [6]*const MicroOp{ nop, nop, nop, nop, nop, nop } }, // 0x6B:

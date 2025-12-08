@@ -19,6 +19,18 @@ pub fn pull_ac(mpu: *MPU) MicroOpError!void {
     mpu.registers.sr.update_zero(mpu.data);
 }
 
+/// Push high byte of program counter to stack and replace addr
+pub fn push_pc_h(mpu: *MPU) MicroOpError!void {
+    mpu.data = @truncate(mpu.registers.pc >> 8);
+    try mpu.push_stack();
+}
+
+/// Push high byte of program counter to stack and replace addr
+pub fn push_pc_h_byte_offset(mpu: *MPU) MicroOpError!void {
+    mpu.data = @truncate((mpu.registers.pc + 1) >> 8);
+    try mpu.push_stack();
+}
+
 /// Push low byte of program counter to stack and replace addr
 pub fn push_pc_l(mpu: *MPU) MicroOpError!void {
     mpu.data = @truncate(mpu.registers.pc);
@@ -26,7 +38,7 @@ pub fn push_pc_l(mpu: *MPU) MicroOpError!void {
 }
 
 /// Push low byte of program counter to stack and replace addr
-pub fn push_pc_l_word_offset(mpu: *MPU) MicroOpError!void {
+pub fn push_pc_l_byte_offset(mpu: *MPU) MicroOpError!void {
     mpu.data = @truncate(mpu.registers.pc + 1);
     try mpu.push_stack();
 }
@@ -35,18 +47,6 @@ pub fn push_pc_l_word_offset(mpu: *MPU) MicroOpError!void {
 pub fn pull_pc_l(mpu: *MPU) MicroOpError!void {
     try mpu.pop_stack();
     mpu.addr = mpu.data;
-}
-
-/// Push high byte of program counter to stack and replace addr
-pub fn push_pc_h(mpu: *MPU) MicroOpError!void {
-    mpu.data = @truncate(mpu.registers.pc >> 8);
-    try mpu.push_stack();
-}
-
-/// Push high byte of program counter to stack and replace addr
-pub fn push_pc_h_word_offset(mpu: *MPU) MicroOpError!void {
-    mpu.data = @truncate((mpu.registers.pc + 1) >> 8);
-    try mpu.push_stack();
 }
 
 /// Pull high byte of program counter from stack and merge with addr
@@ -62,9 +62,21 @@ pub fn push_sr(mpu: *MPU) MicroOpError!void {
     try mpu.push_stack();
 }
 
-/// PUll status register from the stack
+/// Pull status register from the stack
 pub fn pull_sr(mpu: *MPU) MicroOpError!void {
     try mpu.pop_stack();
     mpu.data &= 0xCF; // Clear the ignored and break flags
+    mpu.registers.sr = @bitCast(mpu.data);
+}
+
+pub fn php(mpu: *MPU) MicroOpError!void {
+    mpu.data = @bitCast(mpu.registers.sr);
+    mpu.data |= 0x30; // Set ignored and break flags
+    try mpu.push_stack();
+}
+
+pub fn plp(mpu: *MPU) MicroOpError!void {
+    try mpu.pop_stack();
+    mpu.data &= 0xCF; // Mask off ignored and break flags
     mpu.registers.sr = @bitCast(mpu.data);
 }
