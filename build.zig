@@ -14,7 +14,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const raylib_dep = b.dependency("raylib-zig", .{
+    const raylib_dep = b.dependency("raylib_zig", .{
         .target = target,
         .optimize = optimize,
     });
@@ -24,15 +24,17 @@ pub fn build(b: *std.Build) void {
 
     //** Main executable ****
 
+    const cli = b.addModule("zemu6502", .{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const exe = b.addExecutable(.{
         .name = "zemu6502",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
-        .root_source_file = .{
-            .path = "src/main.zig",
-        },
-        .target = target,
-        .optimize = optimize,
+        .root_module = cli,
     });
     exe.root_module.addImport("yaml", yaml_dep.module("yaml"));
     exe.root_module.addImport("raylib", raylib);
@@ -51,13 +53,12 @@ pub fn build(b: *std.Build) void {
 
     //** Unit tests ****
 
-    const unit_tests = b.addTest(.{
-        .root_source_file = .{
-            .path = "src/main.zig",
-        },
+    const tests_module = b.addModule("test", .{
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
+    const unit_tests = b.addTest(.{ .root_module = tests_module });
     unit_tests.root_module.addImport("yaml", yaml_dep.module("yaml"));
     unit_tests.root_module.addImport("raylib", raylib_dep.module("raylib"));
     unit_tests.linkLibC();
