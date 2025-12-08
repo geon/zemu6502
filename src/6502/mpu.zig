@@ -49,6 +49,14 @@ pub const StatusRegister = packed struct(u8) {
         self.negative = (val & 0x80) != 0;
     }
 
+    /// Update state of overflow register.
+    pub inline fn update_overflow(self: *Self, val: u8, a: u8, x: u8) void {
+        const sign_a = a & 0x80;
+        if (sign_a == (x & 0x80)) {
+            self.overflow = sign_a != (val & 0x80);
+        }
+    }
+
     /// Output the status of the status register to log
     pub fn toLog(self: *Self) void {
         const carry: u8 = if (self.carry) 'C' else 'c';
