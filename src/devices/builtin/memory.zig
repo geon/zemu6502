@@ -40,7 +40,7 @@ pub const RAM = struct {
     /// Read a value from the a peripheral register.
     fn read(ctx: *anyopaque, addr: u16) PeripheralError!u8 {
         const self: *Self = @ptrCast(@alignCast(ctx));
-        if (addr >= self.size) {
+        if (addr > self.size) {
             return PeripheralError.AddressIndex;
         }
         return self.data[addr];
