@@ -72,8 +72,7 @@ fn preDecode(ctx: *anyopaque, mpu: *const MPU) bool {
     if (self.break_points.len > 0) {
         // Ignore the last stop address to allow for stepping.
         if ((self.last_addr != mpu.registers.pc) and (self.isBreakPoint(mpu.registers.pc))) {
-            self.step_count = 0;
-            self.last_addr = mpu.registers.pc;
+            self.step_count = 1;
             std.log.info("[GDB] Breakpoint @ {X:0>4}", .{mpu.registers.pc});
         }
     }
@@ -120,12 +119,14 @@ fn processQuery(self: *Self, system: *System, packet: Packet) !void {
         try self.end_packet(start);
     } else if (packet.startsWith("qBreakpoints")) {
         const start = try self.start_packet();
-        for (self.break_points.slice()) |addr| {
-            try self.out.append(&utils.hexDigits(@truncate(addr >> 8)));
-            try self.out.append(&utils.hexDigits(@truncate(addr)));
-            try self.out.append(";");
+        if (self.break_points.len > 0) {
+            for (self.break_points.slice()) |addr| {
+                try self.out.append(&utils.hexDigits(@truncate(addr >> 8)));
+                try self.out.append(&utils.hexDigits(@truncate(addr)));
+                try self.out.append(";");
+            }
+            self.out.len -= 1; // Remove last final separator.
         }
-        self.out.len -= 1; // Remove last final separator.
         try self.end_packet(start);
     } else {
         // std.log.debug("Unknown query: {s}", .{packet.data});
@@ -268,7 +269,7 @@ fn processPacket(self: *Self, system: *System) !void {
         },
         't' => {
             // Stop the processor
-            self.step_count = 0;
+            self.step_count = 1;
         },
         'r', 'R' => system.reset(),
         'q' => try self.processQuery(system, packet),
@@ -370,7 +371,11 @@ pub fn pollData(self: *Self, connection: net.Server.Connection, system: *System)
     const result = try posix.poll(&fds, 0);
     if (result >= 0 and fds[0].revents > 0) {
         var read_buffer: [4096]u8 = [_]u8{0} ** 4096;
-        const read = try connection.stream.read(&read_buffer);
+        const read = connection.stream.read(&read_buffer) catch |err| switch (err) {
+            std.net.Stream.ReadError.BrokenPipe => 0,
+            std.net.Stream.ReadError.ConnectionResetByPeer => 0,
+            else => return err,
+        };
         if (read == 0) {
             // Connection closed
             std.log.info("[GDB] Connection closed.", .{});
@@ -393,7 +398,7 @@ pub fn pollData(self: *Self, connection: net.Server.Connection, system: *System)
 
     // Write out anything in the output buffer.
     if (self.out.len > 0) {
-        try connection.stream.writeAll(&self.out.data);
+        try connection.stream.writeAll(self.out.asSlice());
         std.log.debug("[GDB] < {s}", .{self.out.asSlice()});
         self.out.clear();
     }
