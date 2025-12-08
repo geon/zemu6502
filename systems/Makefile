@@ -18,5 +18,4 @@ out:
 	mkdir -p $@
 
 default: out/default-rom.bin
-wozmon: out/wozmon-rom.bin
 input: out/input-rom.bin
