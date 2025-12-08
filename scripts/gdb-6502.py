@@ -77,12 +77,13 @@ class GDBClient:
         """Read packet."""
         buffer = bytearray()
         while True:
-            buffer.extend(await self.reader.read(1024))
+            data = await self.reader.read(64)
+            buffer.extend(data)
 
             # Check for a valid packet
             if (start := buffer.find(b"$")) == -1:
                 continue
-            if (end := buffer.find(b"#")) == -1:
+            if (end := buffer.find(b"#", start)) == -1:
                 continue
             packet_end = end + 3
             if len(buffer) < packet_end:
@@ -91,7 +92,7 @@ class GDBClient:
             # Extract the packet and checksum
             packet = buffer[start + 1:end]
             expected_sum = int(buffer[end + 1:end + 3], 16)
-            del buffer[:packet_end]
+            del buffer[:packet_end+1]
 
             # Check the checksum and respond accordingly
             checksum = modulo256_sum(packet)
@@ -179,12 +180,12 @@ class GDBClient:
         items = packet.decode("ascii").split(";")
         return [Peripheral.from_string(item) for item in items]
 
-    async def query_breakpoints(self) -> list[Peripheral]:
+    async def query_breakpoints(self) -> list[int]:
         """Query breakpoints."""
         await self.send_packet(b"qBreakpoints")
         packet = await self.next_packet()
         items = packet.decode("ascii").split(";")
-        return [int(item, 16) for item in items]
+        return [int(item, 16) for item in items] if items else []
 
     async def send_breakpoint(self, address: int, clear: bool = False) -> bool:
         """Send breakpoint."""
@@ -216,6 +217,7 @@ class GDBTextInterface:
             try:
                 await self.parse_command(cmd, client)
             except Exception:
+                client
                 log.exception("Un-handled error")
 
     async def parse_command(self, command: str, client: GDBClient):
@@ -396,7 +398,12 @@ class GDBTextInterface:
                 print_reg("YR", 2)
                 print_reg("SP", 3)
                 print(f"PC: 0x{registers[4:6].hex()}")
-                print(f"SR: 0b{int(registers[6]):08b}")
+                status = bin(int(registers[6]))[2:].zfill(8)
+                flags = [
+                    f.upper() if s == '1' else f.lower()
+                    for f, s in zip("NV BDIZC", status)
+                ]
+                print(f"SR: {status} - {''.join(flags)}")
 
             case ["peripherals"]:
                 print("Peripherals")
