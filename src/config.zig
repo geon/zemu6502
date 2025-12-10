@@ -1,6 +1,6 @@
 //! System configuration.
 const std = @import("std");
-const yaml = @import("yaml");
+const Yaml = @import("yaml").Yaml;
 
 /// Individual device configuration.
 pub const DeviceConfig = struct {
@@ -26,8 +26,12 @@ pub fn from_file(allocator: std.mem.Allocator, path: []const u8) !SystemConfig {
     const file = try std.fs.cwd().readFileAlloc(allocator, path, 1_000_000);
     defer allocator.free(file);
 
-    var raw = try yaml.Yaml.load(allocator, file);
-    defer raw.deinit();
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const arena_allocator = arena.allocator();
 
-    return try raw.parse(SystemConfig);
+    var yaml: Yaml = .{ .source = file };
+    try yaml.load(arena_allocator);
+
+    return try yaml.parse(arena_allocator, SystemConfig);
 }
