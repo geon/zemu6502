@@ -4,7 +4,7 @@ const devices = @import("devices.zig");
 const System = @import("system.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-pub const std_options = .{
+pub const std_options: std.Options = .{
     // Set default log level to info.
     .log_level = .info,
 };
