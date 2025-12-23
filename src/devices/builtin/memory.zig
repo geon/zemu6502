@@ -10,13 +10,15 @@ pub const RAM = struct {
     const Self = @This();
 
     // Actual data, always just use a fixed 64k
-    data: [0x10000]u8 = [_]u8{0} ** 0x10000,
+    data: [0x1_0000]u8 = [_]u8{0} ** 0x1_0000,
     size: u16 = 0xFFFF,
 
     /// Initialise RAM device.
-    pub fn init(allocator: std.mem.Allocator) !*Self {
+    pub fn init(allocator: std.mem.Allocator, size: u16) !*Self {
         const instance = try allocator.create(Self);
-        instance.* = .{};
+        instance.* = .{
+            .size = size,
+        };
         return instance;
     }
 
@@ -29,6 +31,7 @@ pub const RAM = struct {
                 .description = "Random Access Memory.",
                 .read = read,
                 .write = write,
+                .load = load,
                 .registers = registers,
             },
         };
@@ -37,7 +40,7 @@ pub const RAM = struct {
     /// Read a value from the a peripheral register.
     fn read(ctx: *anyopaque, addr: u16) PeripheralError!u8 {
         const self: *Self = @ptrCast(@alignCast(ctx));
-        if (addr >= self.size) {
+        if (addr > self.size) {
             return PeripheralError.AddressIndex;
         }
         return self.data[addr];
@@ -50,6 +53,14 @@ pub const RAM = struct {
             return PeripheralError.AddressIndex;
         }
         self.data[addr] = data;
+    }
+
+    /// Load a file image (up to 64k).
+    fn load(ctx: *anyopaque, data: []const u8) PeripheralError!void {
+        const self: *Self = @ptrCast(@alignCast(ctx));
+        if (data.len > self.data.len) return PeripheralError.AddressIndex;
+        @memcpy(self.data[0..data.len], data);
+        self.size = @truncate(data.len - 1);
     }
 
     /// View of registers
@@ -67,8 +78,8 @@ pub const RAM = struct {
 pub const ROM = struct {
     const Self = @This();
 
-    // Actual data, always just use a fixed 32k
-    data: [0x8000]u8 = [_]u8{0} ** 0x8000,
+    // Actual data, always just use a fixed 64k
+    data: [0x1_0000]u8 = [_]u8{0} ** 0x1_0000,
     size: u16 = 0,
 
     /// Initialise ROM device.
@@ -107,12 +118,12 @@ pub const ROM = struct {
         return PeripheralError.ReadOnly;
     }
 
-    /// Load a file image (up to 32k).
+    /// Load a file image (up to 64k).
     fn load(ctx: *anyopaque, data: []const u8) PeripheralError!void {
         const self: *Self = @ptrCast(@alignCast(ctx));
         if (data.len > self.data.len) return PeripheralError.AddressIndex;
         @memcpy(self.data[0..data.len], data);
-        self.size = @truncate(data.len);
+        self.size = @truncate(data.len - 1);
     }
 
     /// View of registers

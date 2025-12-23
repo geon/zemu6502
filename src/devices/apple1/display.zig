@@ -1,4 +1,4 @@
-//! Terminal peripheral device.
+//! Apple1 Terminal peripheral device.
 
 const std = @import("std");
 const rl = @import("raylib");
@@ -31,7 +31,7 @@ pub fn peripheral(self: *Self) Peripheral {
     return .{
         .ptr = self,
         .vtable = &.{
-            .name = "Terminal",
+            .name = "Apple1 Display",
             .description = "Video display text terminal.",
             .reset = reset,
             .loop = loop,
@@ -67,11 +67,19 @@ fn loop(ctx: *anyopaque) PeripheralError!void {
         const row: i32 = @intCast(row_number);
         rl.drawText(slice, 0, offset - (row * font_size), font_size, rl.Color.green);
     }
+    if (self.cursor_on) {
+        const pos: i32 = @intCast(self.cursor_pos);
+        rl.drawText("_", font_size * pos, offset, font_size, rl.Color.green);
+    }
 }
 
 /// Read a value from a peripheral register.
-fn read(_: *anyopaque, _: u16) PeripheralError!u8 {
-    return PeripheralError.WriteOnly;
+fn read(_: *anyopaque, addr: u16) PeripheralError!u8 {
+    switch (addr) {
+        0 => return 0,
+        1 => return 0,
+        else => return PeripheralError.AddressIndex,
+    }
 }
 
 /// Write a value to a peripheral register.
@@ -80,7 +88,8 @@ fn write(ctx: *anyopaque, addr: u16, data: u8) PeripheralError!void {
 
     switch (addr) {
         0 => {
-            switch (data) {
+            const char: u8 = data & 0x7F; // Strip off bit 7
+            switch (char) {
                 '\n', '\r' => {
                     // Shift each line up
                     var idx = self.line_buffer.len - 1;
@@ -95,7 +104,7 @@ fn write(ctx: *anyopaque, addr: u16, data: u8) PeripheralError!void {
                 },
                 else => {
                     if (self.cursor_pos < (self.line_buffer[0].len - 1)) {
-                        self.line_buffer[0][self.cursor_pos] = data;
+                        self.line_buffer[0][self.cursor_pos] = char;
                         self.cursor_pos += 1;
                     }
                 },

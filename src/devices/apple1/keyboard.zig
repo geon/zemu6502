@@ -1,4 +1,10 @@
 //! Keyboard peripheral device.
+//!
+//! Quirks:
+//! - Bit 7 is always set high
+//! - Only upper case is supported
+//! - Enter returns a Carridge return.
+//!
 
 const std = @import("std");
 const rl = @import("raylib");
@@ -21,10 +27,9 @@ pub fn peripheral(self: *Self) Peripheral {
     return .{
         .ptr = self,
         .vtable = &.{
-            .name = "Keyboard",
+            .name = "Apple1 Keyboard",
             .description = "Keyboard input.",
             .loop = loop,
-            .nmi = nmi,
             .read = read,
             .write = write,
             .reset = reset,
@@ -35,20 +40,18 @@ pub fn peripheral(self: *Self) Peripheral {
 pub fn loop(ctx: *anyopaque) PeripheralError!void {
     const self: *Self = @ptrCast(@alignCast(ctx));
 
-    const char: u8 = switch (rl.getKeyPressed()) {
-        KeyboardKey.key_enter => 0x0A,
+    var char: u8 = switch (rl.getKeyPressed()) {
+        KeyboardKey.key_enter => 0x0D,
         KeyboardKey.key_backspace => 0x08,
         KeyboardKey.key_escape => 0x1B,
         else => @intCast(rl.getCharPressed()),
     };
     if (char > 0) {
-        self.key = char;
+        if (char >= 'a' and char <= 'z') {
+            char -= 32; // Uppercase.
+        }
+        self.key = char | 0x80;
     }
-}
-
-fn nmi(ctx: *anyopaque) bool {
-    const self: *Self = @ptrCast(@alignCast(ctx));
-    return self.key > 0;
 }
 
 fn reset(ctx: *anyopaque) PeripheralError!void {
@@ -59,14 +62,26 @@ fn reset(ctx: *anyopaque) PeripheralError!void {
 fn read(ctx: *anyopaque, addr: u16) PeripheralError!u8 {
     const self: *Self = @ptrCast(@alignCast(ctx));
     switch (addr) {
+        // Data Register
         0 => {
             defer self.key = 0;
             return self.key;
+        },
+        // Control register
+        1 => {
+            return (if (self.key == 0) 0 else 0x80);
         },
         else => return PeripheralError.AddressIndex,
     }
 }
 
-fn write(_: *anyopaque, _: u16, _: u8) PeripheralError!void {
-    return PeripheralError.ReadOnly;
+fn write(_: *anyopaque, addr: u16, _: u8) PeripheralError!void {
+    // const self: *Self = @ptrCast(@alignCast(ctx));
+    switch (addr) {
+        // Data Register
+        0 => return PeripheralError.ReadOnly,
+        // Control register
+        1 => {},
+        else => return PeripheralError.AddressIndex,
+    }
 }

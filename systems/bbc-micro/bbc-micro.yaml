@@ -18,34 +18,34 @@ video:
   scale: 2
   shader:
     # Vertical shader applied to output
-    vert: shaders/scan.vert
+    vert: ../shaders/scan.vert
     # Fragment shader applied to output
-    frag: shaders/scan.frag
+    frag: ../shaders/scan.frag
 
 # Data-bus and peripherals
 dataBus:
-  # Start address mapped into the data-bus (16bit)
   - start: 0x0000
-    # End address mapped into the data-bus (16bit)
     end: 0x3FFF
-    # Peripheral definition
     peripheral:
-      # Type of peripheral
       type: ram
 
-  - start: 0xFF00
+#  - start: 0x8000
+#    end: 0x8000
+#    peripheral:
+#      type: terminal
+#
+#  - start: 0x8010
+#    end: 0x8010
+#    peripheral:
+#      type: keyboard
+
+  - start: 0x8000
+    end: 0xBFFF
+    peripheral:
+      type: "bbc-micro.paged-rom"
+
+  - start: 0xC000
     end: 0xFFFF
     peripheral:
       type: rom
-      # File to load into the peripheral (primarily for ROM devices), can be left off.
-      load: out/input-rom.bin
-
-  - start: 0x8000
-    end: 0x8000
-    peripheral:
-      type: terminal
-
-  - start: 0x8010
-    end: 0x8010
-    peripheral:
-      type: keyboard
+      load: os-rom/os-rom.bin

@@ -46,9 +46,29 @@ pub fn addPeripheral(self: *Self, bus_address: BusAddress) !void {
 /// @returns Optional peripheral
 fn resolve(self: *Self, address: u16) ?struct { u16, Peripheral } {
     for (self.peripherals.items) |item| {
-        if (item.containsAddress(address)) return .{ address - item.start, item.peripheral };
+        if (item.containsAddress(address)) {
+            return .{ address - item.start, item.peripheral };
+        }
     }
     return null;
+}
+
+/// Reset all peripherals on the data-bus.
+pub fn reset(self: *Self) void {
+    for (self.peripherals.items) |item| {
+        item.peripheral.reset() catch |err| {
+            std.log.warn("Error resetting peripheral: {}", .{err});
+        };
+    }
+}
+
+/// Pass loop event handler to data-bus.
+pub fn loop(self: *Self) void {
+    for (self.peripherals.items) |item| {
+        item.peripheral.loop() catch |err| {
+            std.log.warn("Error with peripheral: {}", .{err});
+        };
+    }
 }
 
 /// Pass a clock signal to the data-bus.
@@ -85,11 +105,21 @@ pub fn write(self: *Self, address: u16, data: u8) void {
 }
 
 /// Get the state of the NMI (non-maskable interrupt) line.
-pub fn nmi(_: *Self) bool {
+pub fn nmi(self: *Self) bool {
+    for (self.peripherals.items) |item| {
+        if (item.peripheral.nmi()) {
+            return true;
+        }
+    }
     return false;
 }
 
 /// Get the state of the IRQ (interrupt request) line.
-pub fn irq(_: *Self) bool {
+pub fn irq(self: *Self) bool {
+    for (self.peripherals.items) |item| {
+        if (item.peripheral.irq()) {
+            return true;
+        }
+    }
     return false;
 }

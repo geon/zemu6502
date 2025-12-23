@@ -7,6 +7,25 @@ const ops = @import("instructions.zig");
 const DataBus = @import("../data-bus.zig");
 const Peripheral = @import("../peripheral.zig");
 
+pub const DebugPort = struct {
+    ptr: *anyopaque,
+    vtable: *const VTable,
+
+    pub const VTable = struct {
+        /// Event before decoding (return false if halted)
+        pre_decode: *const fn (ctx: *anyopaque, mpu: *const MPU) bool,
+        /// Event after decoding
+        post_decode: ?*const fn (ctx: *anyopaque, mpu: *const MPU) void = null,
+    };
+
+    fn preDecode(self: DebugPort, mpu: *MPU) bool {
+        return self.vtable.pre_decode(self.ptr, mpu);
+    }
+    fn postDecode(self: DebugPort, mpu: *MPU) void {
+        if (self.vtable.post_decode) |post_decode| post_decode(self.ptr, mpu);
+    }
+};
+
 /// Status register defition.
 pub const StatusRegister = packed struct(u8) {
     const Self = @This();
@@ -28,6 +47,30 @@ pub const StatusRegister = packed struct(u8) {
     /// Update state of negative register.
     pub inline fn update_negative(self: *Self, val: u8) void {
         self.negative = (val & 0x80) != 0;
+    }
+
+    /// Update state of overflow register.
+    pub inline fn update_overflow(self: *Self, val: u8, a: u8, x: u8) void {
+        const sign_a = a & 0x80;
+        if (sign_a == (x & 0x80)) {
+            self.overflow = sign_a != (val & 0x80);
+        }
+    }
+
+    /// Output the status of the status register to log
+    pub fn toLog(self: *Self) void {
+        const carry: u8 = if (self.carry) 'C' else 'c';
+        const zero: u8 = if (self.zero) 'Z' else 'z';
+        const interrupt: u8 = if (self.interrupt) 'I' else 'i';
+        const decimal: u8 = if (self.decimal) 'D' else 'd';
+        const break_: u8 = if (self.break_) 'B' else 'b';
+        const overflow: u8 = if (self.overflow) 'O' else 'o';
+        const negative: u8 = if (self.negative) 'N' else 'n';
+
+        std.log.info(
+            "Status Register: {c}{c}{c}{c}{c}{c}{c}",
+            .{ carry, zero, interrupt, decimal, break_, overflow, negative },
+        );
     }
 };
 
@@ -67,29 +110,15 @@ pub const Registers = struct {
         self.sr = .{};
     }
 
-    /// Add a relative offset to the program counter.
-    pub inline fn pc_add_relative(self: *Self, offset: u8) void {
-        if ((offset & 0x80) == 0) {
-            self.pc += offset;
-        } else {
-            self.pc -= offset & 0x7F;
-        }
+    /// Output the status of the status register to log
+    pub fn toLog(self: *Self) void {
+        std.log.info(
+            "Registers - AC: {0d} (0x{0X:0>2}); XR: {1d}; YR: {2d}; SP: 0x{3X:0>2}; PC: 0x{4X:0>4}",
+            .{ self.ac, self.xr, self.yr, self.sp, self.pc },
+        );
+        self.sr.toLog();
     }
 };
-
-test "add_relative with high bit unset is added" {
-    var target = Registers{ .pc = 40 };
-    target.pc_add_relative(2);
-
-    try std.testing.expectEqual(@as(u16, 42), target.pc);
-}
-
-test "add_relative with high bit set is subtracted" {
-    var target = Registers{ .pc = 40 };
-    target.pc_add_relative(155);
-
-    try std.testing.expectEqual(@as(u16, 13), target.pc);
-}
 
 pub const MicroOpError = error{
     /// Has not been implemented
@@ -99,6 +128,10 @@ pub const MicroOpError = error{
     /// Skip the next micro-op (used for operations that can take an extra
     /// to complete).
     SkipNext,
+    /// Stock overflow (Move stack pointer beyond 0x00)
+    StackOverflow,
+    /// Stock underflow (Move stack pointer over 0xFF)
+    StackUnderflow,
 };
 pub const MicroOp = fn (*MPU) MicroOpError!void;
 pub const Instruction = struct {
@@ -111,17 +144,20 @@ pub const Instruction = struct {
 pub const MPU = struct {
     const Self = @This();
 
-    // Address bus
+    // External buses
     data_bus: *DataBus,
+    debug_port: ?DebugPort = null,
 
     // Register bank and state variables
     registers: Registers = .{},
+    servicing_nmi: bool = false,
+    servicing_irq: bool = false,
     addr: u16 = 0,
     data: u8 = 0,
 
-    // Current operation
-    op_code: u8 = 0,
-    op_current: Instruction = ops.RESET_OPERATION,
+    // Current instruction
+    current: Instruction = ops.RESET_OPERATION,
+    current_loc: u16 = ops.RESET_VECTOR_L,
     op_idx: usize = 0,
 
     // Statistics
@@ -137,8 +173,10 @@ pub const MPU = struct {
     /// Trigger a reset
     pub fn reset(self: *Self) void {
         self.registers.reset();
-        self.op_code = 0;
-        self.op_current = ops.RESET_OPERATION;
+        self.current = ops.RESET_OPERATION;
+        self.current_loc = ops.RESET_VECTOR_L;
+        self.servicing_nmi = false;
+        self.servicing_irq = false;
         self.op_idx = 0;
         self.addr = 0;
         self.data = 0;
@@ -146,12 +184,20 @@ pub const MPU = struct {
 
     /// Clock tick (advance to the next micro-operation)
     pub fn clock(self: *Self, edge: bool) void {
+        self.data_bus.clock(edge);
         if (edge) {
-            self.data_bus.clock(edge);
-
-            if (self.op_current.len == self.op_idx) {
-                self.executed_ops +%= 1;
-                self.decode_next_op();
+            if (self.current.len <= self.op_idx) {
+                if (self.debug_port) |debug_port| {
+                    // Use debug port interface if one is attached.
+                    if (debug_port.preDecode(self)) {
+                        self.executed_ops +%= 1;
+                        self.decode_next_op();
+                        debug_port.postDecode(self);
+                    }
+                } else {
+                    self.executed_ops +%= 1;
+                    self.decode_next_op();
+                }
             } else {
                 self.executed_micro_ops +%= 1;
                 self.execute_next_micro_op();
@@ -160,62 +206,82 @@ pub const MPU = struct {
     }
 
     /// Decode the next operation
+    ///
+    /// This method will also evaluate if there is an iterrupt that needs to be serviced first.
     fn decode_next_op(self: *Self) void {
         self.op_idx = 0;
-        if (self.data_bus.nmi()) {
-            self.op_code = 0;
-            self.op_current = ops.NMI_OPERATION;
-        } else if (self.data_bus.irq()) {
-            self.op_code = 0;
-            self.op_current = ops.IRQ_OPERATION;
+
+        if (!self.servicing_nmi and self.data_bus.nmi()) {
+            self.servicing_nmi = true;
+            self.current_loc = ops.NMI_VECTOR_L;
+            self.current = ops.NMI_OPERATION;
+        } else if (!self.servicing_irq and !self.registers.sr.interrupt and self.data_bus.irq()) {
+            self.servicing_irq = true;
+            self.current_loc = ops.IRQ_VECTOR_L;
+            self.current = ops.IRQ_OPERATION;
         } else {
+            self.current_loc = self.registers.pc;
             self.read_pc();
-            self.op_code = self.data;
-            self.op_current = ops.OPERATIONS[self.op_code];
+            self.current = ops.OPERATIONS[self.data];
         }
     }
 
     fn execute_next_micro_op(self: *Self) void {
-        const micro_op = self.op_current.micro_ops[self.op_idx];
+        const micro_op = self.current.micro_ops[self.op_idx];
         micro_op(self) catch |err| switch (err) {
             MicroOpError.ModeNotImplemented => std.log.warn(
                 "{s} micro-op {d} mode not implemented",
-                .{ self.op_current.syntax, self.op_idx },
+                .{ self.current.syntax, self.op_idx },
             ),
             MicroOpError.NotImplemented => std.log.warn(
                 "{s} micro-op {d} not implemented",
-                .{ self.op_current.syntax, self.op_idx },
+                .{ self.current.syntax, self.op_idx },
             ),
-            MicroOpError.SkipNext => return,
+            MicroOpError.SkipNext => self.op_idx += 1,
+            MicroOpError.StackOverflow => std.log.err("Stack overflow!", .{}),
+            MicroOpError.StackUnderflow => std.log.err("Stack underflow!", .{}),
         };
         self.op_idx += 1;
     }
 
     /// Read value from addr into self.data
-    pub fn read(self: *Self, addr: u16) void {
+    pub inline fn read(self: *Self, addr: u16) void {
         self.data = self.data_bus.read(addr);
     }
 
     /// Read next value from program counter and increment
     pub fn read_pc(self: *Self) void {
+        defer {
+            if (self.registers.pc == 0xFFFF) {
+                std.log.warn("Program counter rollover.", .{});
+                self.registers.pc = 0;
+            } else {
+                self.registers.pc += 1;
+            }
+        }
         self.data = self.data_bus.read(self.registers.pc);
-        self.registers.pc += 1;
     }
 
     /// Write value from self.data to specified addr
-    pub fn write(self: *Self, addr: u16) void {
+    pub inline fn write(self: *Self, addr: u16) void {
         self.data_bus.write(addr, self.data);
     }
 
     /// Write value from self.data to stack location and move pointer.
-    pub fn push_stack(self: *Self) void {
+    pub fn push_stack(self: *Self) MicroOpError!void {
         const addr = 0x0100 + @as(u16, self.registers.sp);
+        if (self.registers.sp == 0x00) {
+            return MicroOpError.StackOverflow;
+        }
         self.registers.sp -= 1;
         self.write(addr);
     }
 
     /// Read value into self.data from stack location and move pointer.
-    pub fn pop_stack(self: *Self) void {
+    pub fn pop_stack(self: *Self) MicroOpError!void {
+        if (self.registers.sp == 0xFF) {
+            return MicroOpError.StackUnderflow;
+        }
         self.registers.sp += 1;
         const addr = 0x0100 + @as(u16, self.registers.sp);
         self.read(addr);
