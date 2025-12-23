@@ -22,7 +22,11 @@ const Args = struct {
 fn processArgs(allocator: Allocator) !Args {
     const args = try std.process.argsAlloc(allocator);
     if (args.len != 2) {
-        try std.io.getStdErr().writer().print(
+        var stderr_buffer: [1024]u8 = undefined;
+        var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+        const stderr = &stderr_writer.interface;
+
+        try stderr.print(
             "Missing config file argument.\n{s} CONFIG_FILE",
             .{args[0]},
         );

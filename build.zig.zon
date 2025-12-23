@@ -1,13 +1,13 @@
 .{
     .name = .zemu6502,
     .version = "0.1.0",
+    .fingerprint = 0xe415a53d4bb168ac, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.15.2",
     .paths = .{
         "src",
         "build.zig",
         "build.zig.zon",
     },
-    .fingerprint = 0xe415a53da0e04f97,
-    .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .raylib_zig = .{
             .url = "git+https://github.com/raylib-zig/raylib-zig?ref=devel#a4d18b2d1cf8fdddec68b5b084535fca0475f466",

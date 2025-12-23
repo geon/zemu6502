@@ -20,23 +20,25 @@ const BusAddress = struct {
     }
 };
 
+allocator: std.mem.Allocator,
 peripherals: std.ArrayList(BusAddress),
 
 /// Initialise data bus.
 pub fn init(allocator: std.mem.Allocator) Self {
     return .{
-        .peripherals = std.ArrayList(BusAddress).init(allocator),
+        .allocator = allocator,
+        .peripherals = std.ArrayList(BusAddress).empty,
     };
 }
 
 /// Deinit
 pub fn deinit(self: *Self) void {
-    self.peripherals.deinit();
+    self.peripherals.deinit(self.allocator);
 }
 
 /// Add a peripheral to the databus
 pub fn addPeripheral(self: *Self, bus_address: BusAddress) !void {
-    try self.peripherals.append(bus_address);
+    try self.peripherals.append(self.allocator, bus_address);
 }
 
 /// Resolve an address to a peripheral

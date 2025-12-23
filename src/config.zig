@@ -1,6 +1,6 @@
 //! System configuration.
 const std = @import("std");
-const yaml = @import("yaml");
+const Yaml = @import("yaml").Yaml;
 
 pub const ConfigError = error{
     FileNotFound,
@@ -64,6 +64,12 @@ pub fn from_file(allocator: std.mem.Allocator, file_path: []const u8) !SystemCon
     };
     defer allocator.free(file);
 
-    var raw = try yaml.Yaml.load(allocator, file);
-    return try raw.parse(SystemConfig);
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const arena_allocator = arena.allocator();
+
+    var yaml: Yaml = .{ .source = file };
+    try yaml.load(arena_allocator);
+
+    return try yaml.parse(arena_allocator, SystemConfig);
 }
