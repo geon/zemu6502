@@ -53,7 +53,7 @@ fn createPeripherals(allocator: Allocator, system_dir: std.fs.Dir, system: *Syst
 
 /// Clone of the method from std library to return a sentenal
 pub fn realpathAlloc(self: std.fs.Dir, allocator: Allocator, pathname: []const u8) ![:0]u8 {
-    var buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
     return allocator.dupeZ(u8, try self.realpath(pathname, buf[0..]));
 }
 
