@@ -99,17 +99,17 @@ fn keyInput(system: *System) void {
                 for (0..(size / 32)) |idx| {
                     const start = idx * 32;
                     std.log.info(
-                        "[{X:0>4}] {} {} {} {} {} {} {} {}",
+                        "[{X:0>4}] {X} {X} {X} {X} {X} {X} {X} {X}",
                         .{
                             item.start + (idx * 32),
-                            std.fmt.fmtSliceHexUpper(data[start .. start + 4]),
-                            std.fmt.fmtSliceHexUpper(data[start + 4 .. start + 8]),
-                            std.fmt.fmtSliceHexUpper(data[start + 8 .. start + 12]),
-                            std.fmt.fmtSliceHexUpper(data[start + 12 .. start + 16]),
-                            std.fmt.fmtSliceHexUpper(data[start + 16 .. start + 20]),
-                            std.fmt.fmtSliceHexUpper(data[start + 20 .. start + 24]),
-                            std.fmt.fmtSliceHexUpper(data[start + 24 .. start + 28]),
-                            std.fmt.fmtSliceHexUpper(data[start + 28 .. start + 32]),
+                            data[start .. start + 4],
+                            data[start + 4 .. start + 8],
+                            data[start + 8 .. start + 12],
+                            data[start + 12 .. start + 16],
+                            data[start + 16 .. start + 20],
+                            data[start + 20 .. start + 24],
+                            data[start + 24 .. start + 28],
+                            data[start + 28 .. start + 32],
                         },
                     );
                 }
