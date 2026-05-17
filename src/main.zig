@@ -83,7 +83,7 @@ fn loadShaderFromConfig(allocator: Allocator, base_dir: std.fs.Dir, video_config
 }
 
 fn keyInput(system: *System) void {
-    if (rl.isKeyPressed(rl.KeyboardKey.key_f6)) {
+    if (rl.isKeyPressed(rl.KeyboardKey.f6)) {
         for (system.data_bus.peripherals.items) |item| {
             if (item.peripheral.registers()) |data| {
                 std.log.info(
@@ -117,7 +117,7 @@ fn keyInput(system: *System) void {
         }
         return;
     }
-    if (rl.isKeyPressed(rl.KeyboardKey.key_f10)) {
+    if (rl.isKeyPressed(rl.KeyboardKey.f10)) {
         std.log.info("Reset...", .{});
         system.reset();
         return;
@@ -169,7 +169,7 @@ pub fn main() !void {
     defer rl.closeWindow();
     const shader = try loadShaderFromConfig(allocator, system_dir, system_config.video);
     defer rl.unloadShader(shader);
-    rl.setExitKey(rl.KeyboardKey.key_f4);
+    rl.setExitKey(rl.KeyboardKey.f4);
 
     // Create system and add devices defined in config.
     var system = try System.init(allocator, system_config.clockFreq);
