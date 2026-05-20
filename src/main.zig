@@ -7,7 +7,7 @@ const GDB = @import("gdb.zig");
 
 const Allocator = std.mem.Allocator;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa: std.heap.DebugAllocator(.{}) = .init;
 pub const std_options: std.Options = .{
     // Set default log level to info.
     .log_level = .debug,
