@@ -28,7 +28,7 @@ last_addr: u16 = 0,
 
 /// Initialise server and start listening for connections
 pub fn init(address: net.Address) !Self {
-    std.log.info("Waiting for GDB connection on {}...", .{address});
+    std.log.info("Waiting for GDB connection on {any}...", .{address});
 
     // TODO: This should be an argument.
     var gpa: std.heap.DebugAllocator(.{}) = .init;
@@ -359,7 +359,7 @@ pub fn checkConnection(self: *Self) !void {
     const result = try posix.poll(&fds, 0);
     if (result >= 0 and fds[0].revents > 0) {
         const connection = try self.server.accept();
-        std.log.info("[GDB] Connection from {}", .{connection.address});
+        std.log.info("[GDB] Connection from {any}", .{connection.address});
         self.connection = connection;
     }
 }
