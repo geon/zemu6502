@@ -48,7 +48,7 @@ pub const BusAddressConfig = struct {
 pub const SystemConfig = struct {
     clockFreq: u64,
     gdb: ?GDBConfig = null,
-    video: VideoConfig,
+    video: ?VideoConfig,
     dataBus: []BusAddressConfig,
 };
 

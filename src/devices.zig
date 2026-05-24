@@ -37,6 +37,7 @@ const DeviceError = error{
 
 /// Create a peripheral device from a config entry.
 pub fn createDevice(allocator: std.mem.Allocator, system_dir: std.fs.Dir, config: *const BusAddressConfig, system_config: *const SystemConfig) !Peripheral {
+    _ = system_config;
     const device_config = config.peripheral;
     const device = Device.fromString(device_config.type) orelse {
         std.log.err("Unknown device type: {s}", .{device_config.type});
@@ -47,11 +48,11 @@ pub fn createDevice(allocator: std.mem.Allocator, system_dir: std.fs.Dir, config
         .keyboard => (try builtin.Keyboard.init(allocator)).peripheral(),
         .ram => (try builtin.RAM.init(allocator, config.size())).peripheral(),
         .rom => (try builtin.ROM.init(allocator, 0)).peripheral(),
-        .terminal => (try builtin.Terminal.init(allocator, &system_config.video)).peripheral(),
+        .terminal => unreachable,
         .@"text-terminal" => (try builtin.TextTerminal.init(allocator)).peripheral(),
         .@"via.w65c22" => (try via.W65c22.init(allocator)).peripheral(),
         .@"apple1.keyboard" => (try apple1.Keyboard.init(allocator)).peripheral(),
-        .@"apple1.display" => (try apple1.Display.init(allocator, &system_config.video)).peripheral(),
+        .@"apple1.display" => unreachable,
     };
 
     std.log.info(
