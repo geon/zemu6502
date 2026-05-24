@@ -1,5 +1,4 @@
 const std = @import("std");
-const rl = @import("raylib");
 const config = @import("config.zig");
 const devices = @import("devices.zig");
 const System = @import("system.zig");
@@ -57,73 +56,6 @@ pub fn realpathAlloc(self: std.fs.Dir, allocator: Allocator, pathname: []const u
     return allocator.dupeZ(u8, try self.realpath(pathname, buf[0..]));
 }
 
-fn loadShaderFromConfig(allocator: Allocator, base_dir: std.fs.Dir, video_config: config.VideoConfig) !rl.Shader {
-    if (video_config.shader) |shader| {
-        const vert_file_path = realpathAlloc(base_dir, allocator, shader.vert) catch |err| switch (err) {
-            error.FileNotFound => {
-                std.log.err("Unable to load vertical shader: {s}", .{shader.vert});
-                return err;
-            },
-            else => return err,
-        };
-        defer allocator.free(vert_file_path);
-
-        const frag_file_path = realpathAlloc(base_dir, allocator, shader.frag) catch |err| switch (err) {
-            error.FileNotFound => {
-                std.log.err("Unable to load fragment shader: {s}", .{shader.frag});
-                return err;
-            },
-            else => return err,
-        };
-        defer allocator.free(frag_file_path);
-
-        return rl.loadShader(vert_file_path, frag_file_path);
-    }
-    return rl.loadShader(null, null);
-}
-
-fn keyInput(system: *System) void {
-    if (rl.isKeyPressed(rl.KeyboardKey.f6)) {
-        for (system.data_bus.peripherals.items) |item| {
-            if (item.peripheral.registers()) |data| {
-                std.log.info(
-                    "Peripheral: {s} - {}bytes",
-                    .{ item.peripheral.vtable.name, data.len },
-                );
-
-                std.log.info(
-                    "       00....03 04....07 08....0B 0C....0F 10....13 14....17 18....1B 1C....1F",
-                    .{},
-                );
-                const size = @min(data.len, 0x3FF);
-                for (0..(size / 32)) |idx| {
-                    const start = idx * 32;
-                    std.log.info(
-                        "[{X:0>4}] {X} {X} {X} {X} {X} {X} {X} {X}",
-                        .{
-                            item.start + (idx * 32),
-                            data[start .. start + 4],
-                            data[start + 4 .. start + 8],
-                            data[start + 8 .. start + 12],
-                            data[start + 12 .. start + 16],
-                            data[start + 16 .. start + 20],
-                            data[start + 20 .. start + 24],
-                            data[start + 24 .. start + 28],
-                            data[start + 28 .. start + 32],
-                        },
-                    );
-                }
-            } else |_| {}
-        }
-        return;
-    }
-    if (rl.isKeyPressed(rl.KeyboardKey.f10)) {
-        std.log.info("Reset...", .{});
-        system.reset();
-        return;
-    }
-}
-
 /// Main entry point
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
@@ -164,13 +96,6 @@ pub fn main() !void {
         instance.deinit();
     };
 
-    // Activate window
-    rl.initWindow(system_config.video.width, system_config.video.height, "ZEMU6502 - Display");
-    defer rl.closeWindow();
-    const shader = try loadShaderFromConfig(allocator, system_dir, system_config.video);
-    defer rl.unloadShader(shader);
-    rl.setExitKey(rl.KeyboardKey.f4);
-
     // Create system and add devices defined in config.
     var system = try System.init(allocator, system_config.clockFreq);
     defer system.deinit();
@@ -184,17 +109,11 @@ pub fn main() !void {
 
     system.reset();
 
-    while (!rl.windowShouldClose()) {
+    while (true) {
         if (gdb) |*instance| {
             try instance.loop(&system);
         }
-        keyInput(&system);
-
-        rl.beginDrawing();
-        rl.beginShaderMode(shader);
         system.loop();
-        rl.endShaderMode();
-        rl.endDrawing();
     }
 }
 
