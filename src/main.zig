@@ -9,7 +9,7 @@ const Allocator = std.mem.Allocator;
 var gpa: std.heap.DebugAllocator(.{}) = .init;
 pub const std_options: std.Options = .{
     // Set default log level to info.
-    .log_level = .debug,
+    .log_level = .info,
 };
 
 /// Stupidly simple command line arguments
