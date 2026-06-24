@@ -2,7 +2,6 @@ const std = @import("std");
 const config = @import("config.zig");
 const devices = @import("devices.zig");
 const System = @import("system.zig");
-const GDB = @import("gdb.zig");
 
 const Allocator = std.mem.Allocator;
 
@@ -15,7 +14,6 @@ pub const std_options: std.Options = .{
 /// Stupidly simple command line arguments
 const Args = struct {
     config_file: []const u8,
-    gdb: bool = false,
 };
 
 fn processArgs(allocator: Allocator) !Args {
@@ -86,33 +84,15 @@ pub fn main() !void {
 
     const system_config = try config.from_file(allocator, config_path);
 
-    // Initialise GDB
-    var gdb: ?GDB = null;
-    if (system_config.gdb) |gdb_config| {
-        const address = try std.net.Address.parseIp6(gdb_config.address, gdb_config.port);
-        gdb = try GDB.init(address);
-    }
-    defer if (gdb) |*instance| {
-        instance.deinit();
-    };
-
     // Create system and add devices defined in config.
     var system = try System.init(allocator, system_config.clockFreq);
     defer system.deinit();
     std.log.info("Initialised system @ {d}Hz", .{system_config.clockFreq});
     try createPeripherals(allocator, system_dir, &system, system_config);
 
-    // Attach GDB
-    if (gdb) |*instance| {
-        system.mpu.debug_port = instance.debugPort();
-    }
-
     system.reset();
 
     while (true) {
-        if (gdb) |*instance| {
-            try instance.loop(&system);
-        }
         system.loop();
     }
 }

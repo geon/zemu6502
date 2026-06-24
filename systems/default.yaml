@@ -2,50 +2,43 @@
 # Clock Frequency (in Hz)
 clockFreq: 1000
 
-# GDB connection
-gdb:
-  # IPv6 address to listen on.
-  address: "::1"
-  # Port to listen on
-  port: 6502
-
 # Video output
 video:
-  # Dimensions of video output
-  width: 640
-  height: 480
-  # Scaling applied to video output
-  scale: 2
-  shader:
-    # Vertical shader applied to output
-    vert: shaders/scan.vert
-    # Fragment shader applied to output
-    frag: shaders/scan.frag
+    # Dimensions of video output
+    width: 640
+    height: 480
+    # Scaling applied to video output
+    scale: 2
+    shader:
+        # Vertical shader applied to output
+        vert: shaders/scan.vert
+        # Fragment shader applied to output
+        frag: shaders/scan.frag
 
 # Data-bus and peripherals
 dataBus:
-  # Start address mapped into the data-bus (16bit)
-  - start: 0x0000
-    # End address mapped into the data-bus (16bit)
-    end: 0x3FFF
-    # Peripheral definition
-    peripheral:
-      # Type of peripheral
-      type: ram
+    # Start address mapped into the data-bus (16bit)
+    - start: 0x0000
+      # End address mapped into the data-bus (16bit)
+      end: 0x3FFF
+      # Peripheral definition
+      peripheral:
+          # Type of peripheral
+          type: ram
 
-  - start: 0xFF00
-    end: 0xFFFF
-    peripheral:
-      type: rom
-      # File to load into the peripheral (primarily for ROM devices), can be left off.
-      load: out/input-rom.bin
+    - start: 0xFF00
+      end: 0xFFFF
+      peripheral:
+          type: rom
+          # File to load into the peripheral (primarily for ROM devices), can be left off.
+          load: out/input-rom.bin
 
-  - start: 0x8000
-    end: 0x8000
-    peripheral:
-      type: terminal
+    - start: 0x8000
+      end: 0x8000
+      peripheral:
+          type: terminal
 
-  - start: 0x8010
-    end: 0x8010
-    peripheral:
-      type: keyboard
+    - start: 0x8010
+      end: 0x8010
+      peripheral:
+          type: keyboard

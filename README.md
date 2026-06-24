@@ -42,16 +42,6 @@ Planned:
 * Emulation of an IO controller
 * GPIO via external hardware.
 
-### Debugging
-
-A debug interface using the GDB remote debugging protocol is provided (if enabled in
-configuration). A Python script in `scripts/gdb-6502.py` provides a basic interactive
-interface (GDB itself does not support the 6502). This script will get improvements
-over time, but for now it can read/write and memory address, read all registers,
-halt/step the processor, query peripherals and reset the system.
-
-Writing back to registers could be added in the future.
-
 ## Design
 
 Every instruction is made up of micro-operations, these are the actual operations
@@ -63,7 +53,6 @@ Peripherals are implemented with a standard peripheral interface providing:
 * read/write functions using a 16bit address and 8bit data
 * clock signal (with both rising and falling edges)
 * optional load function to load a binary (primarily to initialise ROM)
-* optional register dump function for future gdb integration
 
 Future enhancement to include NMI and IRQ status requests.
 
