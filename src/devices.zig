@@ -14,7 +14,6 @@ const Device = enum {
     // Builtin devices
     ram,
     rom,
-    @"text-terminal",
     keyboard,
 
     fn fromString(name: []const u8) ?Self {
@@ -40,7 +39,6 @@ pub fn createDevice(allocator: std.mem.Allocator, system_dir: std.fs.Dir, config
         .keyboard => (try builtin.Keyboard.init(allocator)).peripheral(),
         .ram => (try builtin.RAM.init(allocator, config.size())).peripheral(),
         .rom => (try builtin.ROM.init(allocator, 0)).peripheral(),
-        .@"text-terminal" => (try builtin.TextTerminal.init(allocator)).peripheral(),
     };
 
     std.log.info(
