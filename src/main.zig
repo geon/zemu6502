@@ -10,15 +10,6 @@ pub const std_options: std.Options = .{
     .log_level = .info,
 };
 
-fn createPeripherals(allocator: Allocator, system: *System) !void {
-    const peripheral = try devices.createDevice(allocator);
-    try system.data_bus.addPeripheral(.{
-        .start = 0,
-        .end = 0xffff,
-        .peripheral = peripheral,
-    });
-}
-
 /// Main entry point
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(gpa.allocator());
@@ -31,7 +22,13 @@ pub fn main() !void {
     var system = try System.init(allocator, clockFreq);
     defer system.deinit();
     std.log.info("Initialised system @ {d}Hz", .{clockFreq});
-    try createPeripherals(allocator, &system);
+
+    const peripheral = try devices.createDevice(allocator);
+    try system.data_bus.addPeripheral(.{
+        .start = 0,
+        .end = 0xffff,
+        .peripheral = peripheral,
+    });
 
     system.reset();
 
