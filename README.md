@@ -30,10 +30,6 @@ The initial goal is to run Woz-mon in the emulator to provide a basic test case.
 
 ### Devices
 
-Devices in development:
-
-* Bit-mapped graphics (incorporating a terminal)
-
 Planned:
 
 * Banked RAM
@@ -71,7 +67,6 @@ The default system can be found in the `systems/default.yaml` and resolves to:
 | 0x0000-0x3FFF | RAM        |                                         |
 | 0x0100-0x01FF |            | Stack                                   |
 | 0x4000-0x7FFF | -          |                                         |
-| 0x8000        | Terminal   | Write-only, data treated as characters. |
 | 0x8001-0x800F | -          |                                         |
 | 0x8010        | Keyboard   | Read-only, not currently implemented.   |
 | 0x801F-0xEFFF | -          |                                         |

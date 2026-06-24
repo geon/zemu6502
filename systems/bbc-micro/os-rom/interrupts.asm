@@ -1,5 +1,0 @@
-nmiEntryPoint:
-        RTI
-
-irqEntryPoint:
-        RTI
