@@ -4,6 +4,7 @@ const std = @import("std");
 const Clock = @import("clock.zig");
 const DataBus = @import("data-bus.zig");
 const MPU = @import("6502.zig").MPU;
+const devices = @import("devices.zig");
 
 const Self = @This();
 
@@ -22,12 +23,21 @@ pub fn init(allocator: std.mem.Allocator, freq_hz: u64) !Self {
     errdefer allocator.destroy(mpu);
     mpu.* = MPU.init(data_bus);
 
-    return .{
+    const system = .{
         .allocator = allocator,
         .data_bus = data_bus,
         .mpu = mpu,
         .clock = try Clock.init(freq_hz, mpu),
     };
+
+    const peripheral = try devices.createDevice(allocator);
+    try system.data_bus.addPeripheral(.{
+        .start = 0,
+        .end = 0xffff,
+        .peripheral = peripheral,
+    });
+
+    return system;
 }
 
 /// Clean up MCU instance.

@@ -1,5 +1,4 @@
 const std = @import("std");
-const devices = @import("devices.zig");
 const System = @import("system.zig");
 
 const Allocator = std.mem.Allocator;
@@ -18,17 +17,9 @@ pub fn main() !void {
 
     const clockFreq = 10;
 
-    // Create system and add devices.
     var system = try System.init(allocator, clockFreq);
     defer system.deinit();
     std.log.info("Initialised system @ {d}Hz", .{clockFreq});
-
-    const peripheral = try devices.createDevice(allocator);
-    try system.data_bus.addPeripheral(.{
-        .start = 0,
-        .end = 0xffff,
-        .peripheral = peripheral,
-    });
 
     system.reset();
 
