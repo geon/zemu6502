@@ -88,7 +88,3 @@ Simple virtual devices not based on a physical component.
 * rom - ROM device, defaults to 0x8000 bytes (actual addressable range based on config)
   * Use load option to provide an initial ROM image
 * keyboard - Keyboard input
-
-### Versatile Interface Adapter (VIA) devices
-
-* w65c22 - WDC W65C22 VIA device (in development currently only provides registers)
