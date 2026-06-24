@@ -87,7 +87,6 @@ Simple virtual devices not based on a physical component.
 * ram - RAM device, defaults to 0xFFFF bytes (actual addressable range based on config)
 * rom - ROM device, defaults to 0x8000 bytes (actual addressable range based on config)
   * Use load option to provide an initial ROM image
-* terminal - Basic character terminal to output text Apple I style
 * keyboard - Keyboard input
 
 ### Versatile Interface Adapter (VIA) devices

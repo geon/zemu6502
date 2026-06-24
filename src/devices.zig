@@ -7,7 +7,6 @@ const Peripheral = @import("peripheral.zig");
 
 pub const builtin = @import("devices/builtin.zig");
 pub const via = @import("devices/via.zig");
-pub const apple1 = @import("devices/apple1.zig");
 
 /// Definition of all devices.
 const Device = enum {
@@ -21,9 +20,6 @@ const Device = enum {
     keyboard,
     // VIA devices
     @"via.w65c22",
-    // Apple1 devices
-    @"apple1.keyboard",
-    @"apple1.display",
 
     fn fromString(name: []const u8) ?Self {
         return std.meta.stringToEnum(Self, name);
@@ -51,8 +47,6 @@ pub fn createDevice(allocator: std.mem.Allocator, system_dir: std.fs.Dir, config
         .terminal => unreachable,
         .@"text-terminal" => (try builtin.TextTerminal.init(allocator)).peripheral(),
         .@"via.w65c22" => (try via.W65c22.init(allocator)).peripheral(),
-        .@"apple1.keyboard" => (try apple1.Keyboard.init(allocator)).peripheral(),
-        .@"apple1.display" => unreachable,
     };
 
     std.log.info(
