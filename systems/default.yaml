@@ -25,15 +25,3 @@ dataBus:
       peripheral:
           # Type of peripheral
           type: ram
-
-    - start: 0xFF00
-      end: 0xFFFF
-      peripheral:
-          type: rom
-          # File to load into the peripheral (primarily for ROM devices), can be left off.
-          load: out/input-rom.bin
-
-    - start: 0x8010
-      end: 0x8010
-      peripheral:
-          type: keyboard

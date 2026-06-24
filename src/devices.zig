@@ -13,8 +13,6 @@ const Device = enum {
 
     // Builtin devices
     ram,
-    rom,
-    keyboard,
 
     fn fromString(name: []const u8) ?Self {
         return std.meta.stringToEnum(Self, name);
@@ -36,9 +34,7 @@ pub fn createDevice(allocator: std.mem.Allocator, system_dir: std.fs.Dir, config
     };
 
     var peripheral = switch (device) {
-        .keyboard => (try builtin.Keyboard.init(allocator)).peripheral(),
         .ram => (try builtin.RAM.init(allocator, config.size())).peripheral(),
-        .rom => (try builtin.ROM.init(allocator, 0)).peripheral(),
     };
 
     std.log.info(
