@@ -11,18 +11,14 @@ fn Memory(comptime TReadonly: bool) type {
 
         // Actual data, always just use a fixed 64k
         data: [0x1_0000]u8 = [_]u8{0} ** 0x1_0000,
-        size: u16 = if (TReadonly) 0 else 0xFFFF,
+        size: u16,
 
         /// Initialise RAM/ROM device.
         pub fn init(allocator: std.mem.Allocator, size: u16) !*Self {
             const instance = try allocator.create(Self);
-            if (TReadonly) {
-                instance.* = .{};
-            } else {
-                instance.* = .{
-                    .size = size,
-                };
-            }
+            instance.* = .{
+                .size = size,
+            };
             return instance;
         }
 
