@@ -1,0 +1,11 @@
+*=0x1000
+
+lda #0xd
+sta 2
+lda #0xe
+sta 3
+lda #0xa
+sta 4
+lda #0xd
+sta 5
+brk
