@@ -11,6 +11,7 @@ fn Memory(comptime TReadonly: bool) type {
 
         // Actual data, always just use a fixed 64k
         data: [0x1_0000]u8 = [_]u8{0} ** 0x1_0000,
+        // Excess-1 notation, so that the full memory range can be used. Zero size memory is not possible.
         size: u16,
 
         /// Initialise RAM/ROM device.
@@ -40,14 +41,8 @@ fn Memory(comptime TReadonly: bool) type {
         /// Read a value from the a peripheral register.
         fn read(ctx: *anyopaque, addr: u16) PeripheralError!u8 {
             const self: *Self = @ptrCast(@alignCast(ctx));
-            if (TReadonly) {
-                if (addr >= self.size) {
-                    return PeripheralError.AddressIndex;
-                }
-            } else {
-                if (addr > self.size) {
-                    return PeripheralError.AddressIndex;
-                }
+            if (addr >= self.size) {
+                return PeripheralError.AddressIndex;
             }
             return self.data[addr];
         }
@@ -76,7 +71,7 @@ fn Memory(comptime TReadonly: bool) type {
         /// View of registers
         fn registers(ctx: *anyopaque) PeripheralError![]u8 {
             const self: *Self = @ptrCast(@alignCast(ctx));
-            return self.data[0..self.size];
+            return self.data[0 .. @as(u32, self.size) + 1];
         }
     };
 }
