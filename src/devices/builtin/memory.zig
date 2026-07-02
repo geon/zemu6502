@@ -65,7 +65,9 @@ fn Memory(comptime TReadonly: bool) type {
             const self: *Self = @ptrCast(@alignCast(ctx));
             if (data.len > self.data.len) return PeripheralError.AddressIndex;
             @memcpy(self.data[0..data.len], data);
-            self.size = @truncate(data.len - 1);
+            if (TReadonly) {
+                self.size = @truncate(data.len - 1);
+            }
         }
 
         /// View of registers
